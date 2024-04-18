@@ -7,6 +7,8 @@
 #include <fcntl.h>
 #include <unistd.h>
 
+#define MAX 10 //nu se vor putea introduce mai mult de MAX argumente in linia de comanda
+
 //structura pentru a stoca metadatele unei intrari din director
 typedef struct 
 {
@@ -26,15 +28,21 @@ Metadata getMetadata(const char *path)
         exit(EXIT_FAILURE);
     }
 
+    //inregistram momentul la  care a fost creata ultima metadata
     metadata.last_modified = file_stat.st_mtime;
 
     return metadata;
 }
 
 //functie pentru realizarea unei capturi a directorului dat ca argument
-void takeSnapshot(char *directory)
+void takeSnapshot(char *directory, char *output_dir)
 {
+    char snapshot_path[256];
+
+    snprintf(snapshot_path, sizeof(snapshot_path), "%s/snapshot.txt", output_dir);
+
     int snapshot_fd = open("snapshot.txt", O_WRONLY | O_CREAT | O_TRUNC, S_IRUSR | S_IWUSR);
+    
     if (snapshot_fd== -1)
     {
         printf("nu s-a putut crea snapshot file\n");
@@ -66,15 +74,50 @@ void takeSnapshot(char *directory)
 
 int main(int argc, char* argv[])
 {
-    if(argc != 2) //verificam daca avem exact 2 argumente in linia de comanda 
+    if(argc < 3 || MAX + 2) //verificam daca avem intre 3 si MAX+2 argumente in linia de comanda 
     {
-        printf("numar incorect de argumente\n");
+        printf("Numar incorect de argumente.\n Folosiți: ./program -o director_ieșire director1 [director2 ...]\n");
         exit(EXIT_FAILURE);
     }
 
-    char *directory = argv[1];
-    takeSnapshot(directory);
+    char *output_dir = NULL;
+    char *directories[MAX];
+    int count_directories = 0;
 
-    printf("S-a realizat captura de fisier\n");
+    for (int i = 1; i < argc; i++) 
+    {
+        if (strcmp(argv[i], "-o") == 0) 
+        {
+            if (i + 1 >= argc) 
+            {
+                printf("Opțiunea -o necesită un director de ieșire.\n");
+                exit(EXIT_FAILURE);
+            }
+            output_dir = argv[i + 1];
+            i++; // Trecem peste directorul de ieșire pentru a nu îl procesa ca director de intrare
+        } 
+        else 
+        {
+            if (count_directories >= MAX) 
+            {
+                printf("Prea multe directoare. Maxim %d sunt permise.\n", MAX);
+                exit(EXIT_FAILURE);
+            }
+            directories[count_directories++] = argv[i];
+        }
+    }
+
+    if (output_dir == NULL) 
+    {
+        printf("Nu a fost specificat un director de ieșire.\n");
+        exit(EXIT_FAILURE);
+    }
+
+    for (int i = 0; i < count_directories; i++) 
+    {
+        takeSnapshot(directories[i], output_dir);
+        printf("Captura de la directorul %s a fost realizată cu succes.\n", directories[i]);
+    }
+
     return 0;
 }
